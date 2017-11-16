@@ -358,9 +358,11 @@ function vol_scan($memfile, $indications)
     .\volatility.exe -f $memfile --profile=$global:profile --kdbg=$global:kdbg psxview --output=xlsx --output-file="$global:outpath\Volatility\psxview.xlsx"
     .\volatility.exe -f $memfile --profile=$global:profile --kdbg=$global:kdbg netscan --output=xlsx --output-file="$global:outpath\Volatility\netscan.xlsx"
     .\volatility.exe -f $memfile --profile=$global:profile --kdbg=$global:kdbg malfind --output=xlsx --output-file="$global:outpath\Volatility\malfind.xlsx"
+    #make yara_file here have function return filepath ip_12_12_12_12 is format to use
     foreach ($indicator in $indications)
     {
          .\volatility.exe -f $memfile --profile=$global:profile --kdbg=$global:kdbg yarascan --yara-rules=$indicator --output=xlsx --output-file="$global:outpath\Volatility\yara_$indicator.xlsx"
+         #.\volatility.exe -f $memfile --profile=$global:profile --kdbg=$global:kdbg yarascan --y $yara_rule_file --output=xlsx --output-file="$global:outpath\Volatility\yara_$indicator.xlsx"
     }
 }
 
