@@ -3,8 +3,11 @@ $global:outpath
 $global:memPath
 $global:pcapPath
 $global:netflowPath
+$global:yara_pid
+$global:process_name
 $global:ip_frombox
 $global:offset
+$global:status
 $global:start
 $global:end
 
@@ -177,6 +180,7 @@ Modified: 2011-04-09 
 
 function stage()
 {
+    $global:status="Setting the Stage"
     [string]$date = ([string]$date = Get-Date) | % {$_ -replace("/", "_") } | % {$_ -replace(" ", "_")} |  % {$_ -replace(":", "_")}
     $global:outpath="D:\Week 5\$date"
     mkdir "$global:outpath\Volatility"
@@ -196,13 +200,14 @@ function get_ip()
 
 function read_csv($csv_source)
 {
+    $global:status = "Reading CSV"
     $csv_file = Import-Csv $csv_source
     return $csv_file
 }
 
 function make_utc($timevalue, $offset)
 {
-    
+    $global:status = "Getting UTC Values"
     $temptime = [datetime]$timevalue
     $temptime = $temptime.addhours($offset)
     return [string]$temptime
@@ -210,12 +215,14 @@ function make_utc($timevalue, $offset)
 
 function get_header($csv)
 {
+    $global:status = "Getting CSV Headers"
     $csv_header = $csv | get-member |Where-Object {$_.MemberType -eq "NoteProperty"} | select-object Name
     return $csv_header
 }
 
 function csv_parser($csv_file, $ip_list)
 {
+    $global:status = "Starting CSV Parser"
     $ip_src_matches = @()
     $ip_dst_matches = @()
     $ip_two_degree_matches = @()
@@ -225,11 +232,13 @@ function csv_parser($csv_file, $ip_list)
     {
         if($ip_list.contains($csv.'Source IP address'))
         {
+            $global:status = "Parsing Source IP $csv.'Source IP address'"
             $ip_src_matches += $csv
             $two_degrees = $csv.'Destination IP address'
         }
         elseif($ip_list.contains($csv.'Destination IP address'))
         {
+            $global:status = "Parsing Destination IP $csv.'Destination IP address'"
             $ip_dst_matches += $csv
             $two_degrees = $csv.'Source IP address'
         }
@@ -238,11 +247,11 @@ function csv_parser($csv_file, $ip_list)
         {
             if($two_degrees.contains($csv.'Source IP address') -or $two_degrees.contains($csv.'Destination IP address'))
             {
+                $global:status = "Getting Two Degree Match"
                 $ip_two_degree_matches += $csv
             }
         }  
     }
-    
     $master_ip_list = $ip_src_matches+$ip_dst_matches+$ip_two_degree_matches
     $master_ip_list = $master_ip_list | sort 'Source IP address','Destination IP address','Flow Start Time','Flow End Time' -Unique
     $match_array = ($ip_src_matches, $ip_dst_matches, $ip_two_degree_matches, $master_ip_list)
@@ -251,6 +260,7 @@ function csv_parser($csv_file, $ip_list)
 
 function make_sheet($worksheet, $list)
 {
+    $global:status = "Making Excel Worksheet"
     $wsHeader = $null
     if(!$wsHeader)
     {
@@ -258,6 +268,7 @@ function make_sheet($worksheet, $list)
     $wsColumns = 1
 	#foreach ($header in $wsHeader)
 	#{
+            $global:status = "Making Excel Worksheet Headers"
             $wsColumns = 1
             $worksheet.Cells.Item($global:wsRows,$wsColumns) = "Flow Start Time"; $wsColumns++;
             $worksheet.Cells.Item($wsRows,$wsColumns) = "UTC Start Time"; $wsColumns++;
@@ -279,6 +290,7 @@ function make_sheet($worksheet, $list)
     }
     foreach($ip in $list)
     {
+        $global:status = "Filling in Excel Information for $ip.'Source IP address'"
         $wsColumns = 1
         $worksheet.Cells.Item($global:wsRows,$wsColumns) = $ip.'Flow Start Time'; $wsColumns++;
 	    $worksheet.Cells.Item($wsRows,$wsColumns) = make_utc $ip.'Flow Start Time' $global:offset; $wsColumns++;
@@ -307,7 +319,7 @@ function make_sheet($worksheet, $list)
 
 function excel_export($master)
 {
-    
+    $global:status = "Making Excel COM Object"
     $iXL = New-Object -ComObject Excel.Application
     $workbook = $iXL.WorkBooks.add()
     $worksheet1 = $workbook.Worksheets.Add()
@@ -336,6 +348,7 @@ function excel_export($master)
 
 function get_indicators($master)
 {
+    $global:status = "Making Master Idicator List"
     $iplist = @()
     foreach($value in $master)
     {
@@ -348,6 +361,7 @@ function get_indicators($master)
 
 function vol_scan($memfile, $indications)
 {
+    $global:status = "Running Volatility"
     D:
     cd 'D:\Week 5\volatility_standalone'
     $global:imageinfo = .\volatility.exe -f $memfile imageinfo
@@ -362,7 +376,7 @@ function vol_scan($memfile, $indications)
     foreach ($indicator in $indications)
     {
          .\volatility.exe -f $memfile --profile=$global:profile --kdbg=$global:kdbg yarascan --yara-rules=$indicator --output=xlsx --output-file="$global:outpath\Volatility\yara_$indicator.xlsx"
-         #.\volatility.exe -f $memfile --profile=$global:profile --kdbg=$global:kdbg yarascan --y $yara_rule_file --output=xlsx --output-file="$global:outpath\Volatility\yara_$indicator.xlsx"
+         #.\volatility.exe -f $memfile --profile=$global:profile --kdbg=$global:kdbg yarascan --y $yara_rule_file --output=xlsx --output-file="$global:outpath\Volatility\yara_indicators.xlsx"
     }
 }
 
@@ -375,26 +389,39 @@ function get_fileName()
  $OpenFileDialog.ShowDialog() | Out-Null
  return $OpenFileDialog.filename
 } 
-<#
+
 function get_malware($memfile, $yara_dir)
 {    
-    $yara_master
+    #$yara_master
     $yara_files = (ls $yara_dir\yara*.xlsx | % {$_.Name})
     foreach($file in $yara_files){$yara_master += Import-Xls "$yara_dir\$file"}
-    $inc=0; $inc2 = 1;
     $yara_parser = $yara_master | %{ $_.Owner }
-    $global:process_name = @(); $global:yara_pid = @()
-    $yara_parser | foreach($process in $_){$global:process_name += $yara_parser[$inc];$inc+=2}
-    foreach($process in $yara_parser){$global:yara_pid += $yara_parser[$inc2];$inc2+=2}
-
-}#>
+    $global:yara_pid = $null; $global:yara_pid = @()
+    $global:process_name = $null; $global:process_name = @()
+    foreach ($yara in $yara_parser)
+    {
+       $global:yara_pid += ($yara | % {$_ -split":"})[1] | % {$_ -replace("\(","") -replace("\)","") -replace("Pid ","")} 
+       $global:process_name += ($yara | % {$_ -split":"})[0]
+    }
+    D:
+    cd 'D:\Week 5\volatility_standalone'
+    $global:yara_pid = $global:yara_pid | sort -Unique
+    $global:process_name = $global:process_name | sort -Unique
+    foreach ($processID in $global:yara_pid)
+    {
+        .\volatility.exe -f $memfile --profile=$global:profile --kdbg=$global:kdbg procdump -p $processID -D $global:outpath\Malware --output
+    }
+    write-host "malicious exe found: <Not in Order> $global:process_name with PIDs $global:yara_pid <Not in Order>"
+}
 
 function pcap_filter($pcap_path, $indications)
 {
+    $global:status = "Filtering PCAPs"
     D:
     cd 'D:\Week 5'
     foreach($indication in $indications)
     {
+        $global:status = "Filtering PCAP for $indication"
         $path = "$global:outpath\Wireshark\PCAPs\$indication filter.pcap"
         .\WinDump.exe -n -r $pcap_path -w $path host $indication 
     }
@@ -402,6 +429,7 @@ function pcap_filter($pcap_path, $indications)
 
 function snort($pcap_path)
 {
+    $global:status = "Running Snort"
     C:
     cd "C:\snort\bin"
     .\snort.exe -r $pcap_path -c C:\Snort\etc\snort.conf -l C:\Snort\log -yU
@@ -510,9 +538,10 @@ function GUI()
 
 function main()
 {
-    $global:start = get-date
-    stage
+    $global:start = Get-Date
 
+    stage
+    #Write-Progress -Activity "Parsing Files" -Status $global:status
 
     $csvfile = read_csv($global:netflowPath)
     $ips = $global:ip_frombox#('174.129.50.106')#get_ip
@@ -522,6 +551,9 @@ function main()
     snort $global:pcapPath
     pcap_filter $global:pcapPath $potential_ioc_ips
     vol_scan $global:memPath $potential_ioc_ips 
+    $global:end = Get-Date
+
+    Write-Host "this took $global:start to $global:end to run"
     
 }
 
