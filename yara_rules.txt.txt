@@ -1,0 +1,7 @@
+rule ip_X_X_X_X
+{
+    strings:
+	$var="X.X.X.X"
+    condition:
+	$var
+}
