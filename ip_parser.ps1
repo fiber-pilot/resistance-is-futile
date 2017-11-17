@@ -188,6 +188,7 @@ function stage()
     mkdir "$global:outpath\Netflow"
     mkdir "$global:outpath\Snort"
     mkdir "$global:outpath\Malware"
+    copy 'D:\Week 5\timeline_template.xlsx' $global:outpath\timeline.xlsx
 }
 
 function get_ip()
@@ -389,6 +390,28 @@ function get_fileName()
  $OpenFileDialog.ShowDialog() | Out-Null
  return $OpenFileDialog.filename
 } 
+
+function build_yara($indicators)
+{
+    $rulename = "rule"
+    foreach($item in $indicators)
+    {
+        $ipaddr = '$ipaddr'
+        $rule = [string]$item
+        $ruleName = "ip_"+[string]$item | %{$_ -replace("\.","_")}
+        #$rule | % {$_ -replace("\.",
+        echo "rule $ruleName" >> $global:outpath\yara_rules.yara
+        echo "{" >> $global:outpath\yara_rules.yara
+        echo "    strings:" >> $global:outpath\yara_rules.yara
+        [string]$stupidline = echo "        $ipaddr= " "'$rule'" 
+        echo $stupidline >> $global:outpath\yara_rules.yara
+        echo "    condition: " >> $global:outpath\yara_rules.yara
+        echo "        $ipaddr " >> $global:outpath\yara_rules.yara
+        echo "}" >> $global:outpath\yara_rules.yara
+        #$file = Get-Content $global:outpath\yara_rules.yara 
+        #$file | Out-File -Encoding ascii -FilePath $global:outpath\yara_rules.yara
+    }
+}
 
 function get_malware($memfile, $yara_dir)
 {    
