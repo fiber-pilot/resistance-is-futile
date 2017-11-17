@@ -1,0 +1,5 @@
+
+
+$base64string = [Convert]::ToBase64String([IO.File]::ReadAllBytes($FileName))
+
+[IO.File]::WriteAllBytes($FileName, [Convert]::FromBase64String($base64string))
